@@ -1,0 +1,63 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - wbtech-network
+
+  nats-streaming:
+    image: nats-streaming:latest
+    command: [ "-cid", "${NATS_CLUSTER_ID}" ]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - wbtech-network
+
+  server:
+    build: .
+    command: ./server
+    depends_on:
+      - postgres
+      - nats-streaming
+    environment:
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT}
+      DB_HOST: postgres
+      NATS_CLUSTER_ID: ${NATS_CLUSTER_ID}
+      NATS_SERVER_URL: nats://nats-streaming:4222
+      HTTP_ADDRESS: 0.0.0.0:8080
+    networks:
+      - wbtech-network
+    ports:
+      - "8080:8080"
+
+  client:
+    build: .
+    command: ./client
+    depends_on:
+      - server
+      - nats-streaming
+    environment:
+      NATS_CLUSTER_ID: ${NATS_CLUSTER_ID}
+      NATS_CLIENT_ID: ${NATS_CLIENT_ID}
+      NATS_SERVER_URL: nats://nats-streaming:4222
+      NATS_CLIENT_TICKER_SECONDS: ${NATS_CLIENT_TICKER_SECONDS}
+    networks:
+      - wbtech-network
+
+networks:
+  wbtech-network:
+
+volumes:
+  pgdata:
